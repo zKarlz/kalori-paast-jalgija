@@ -7,8 +7,8 @@
   <!-- Chart.js for graphs -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <!-- Google font for improved typography -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Google fonts for improved typography (using Mona Sans to match dashdark template) -->
+  <link href="https://fonts.googleapis.com/css2?family=Mona+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary: #006bb3;
@@ -107,18 +107,20 @@
 
     /* Additional dark theme styles inspired by RedStar admin dashboard */
     :root {
-      --bg: #1a2238;
-      --sidebar-bg: #11172f;
-      --sidebar-active: #273469;
-      --sidebar-hover: #212d49;
-      --card-bg: #2d315e;
-      --border: #3c447a;
-      --text: #e6e7ff;
-      --muted: #9ca3c7;
-      --primary-blue: #2f80ed;
-      --primary-green: #27ae60;
-      --primary-orange: #eb5757;
-      --primary-purple: #9b51e0;
+      /* Updated colour palette inspired by Dashdark template */
+      --bg: #080f25;
+      --sidebar-bg: #101935;
+      --sidebar-active: #212c4d;
+      --sidebar-hover: #343b4f;
+      --card-bg: #212c4d;
+      --border: #37446b;
+      --text: #aeb9e1;
+      --muted: #7e89ac;
+      --primary-blue: #57c3ff;
+      --primary-green: #14ca74;
+      --primary-orange: #fdb52a;
+      --primary-purple: #6c72ff;
+      --primary-red: #dc2b2b;
     }
 
     /* Hide old header and nav */
@@ -129,7 +131,7 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Inter', Arial, sans-serif;
+      font-family: 'Mona Sans', Arial, sans-serif;
     }
 
     /* Sidebar styles */
@@ -299,6 +301,8 @@
       padding: 1rem;
       color: var(--text);
       box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
     }
     .metric-card .title {
       font-size: 0.9rem;
@@ -308,6 +312,12 @@
     .metric-card .value {
       font-size: 1.4rem;
       font-weight: bold;
+      margin-bottom: 0.3rem;
+    }
+
+    .metric-card .icon {
+      font-size: 1.4rem;
+      margin-bottom: 0.4rem;
     }
 
     /* Table styles */
@@ -418,10 +428,13 @@
     <div id="sectionLog" class="section">
       <h2>Päeviku kanne</h2>
       <form id="logForm">
-        <label for="logDate">Kuupäev</label>
+        <label for="logDateDisplay">Kuupäev</label>
         <div class="btn-row">
           <button type="button" class="secondary-btn" id="prevDay">←</button>
-          <input type="date" id="logDate" required />
+          <!-- Visible date input in DD/MM/YYYY format -->
+          <input type="text" id="logDateDisplay" required pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" />
+          <!-- Hidden ISO date input used internally -->
+          <input type="hidden" id="logDate" />
           <button type="button" class="secondary-btn" id="nextDay">→</button>
         </div>
         <label for="calories">Tarbitud kalorid (kcal)</label>
@@ -545,6 +558,44 @@ function dateToISO(date) {
 function isoToDate(str) {
   return new Date(str);
 }
+// Convert ISO date string (YYYY-MM-DD) to display format DD/MM/YYYY
+function formatDateDisplay(isoStr) {
+  const d = new Date(isoStr);
+  const day = ('0' + d.getDate()).slice(-2);
+  const month = ('0' + (d.getMonth() + 1)).slice(-2);
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+// Parse a display date (DD/MM/YYYY) and return ISO date string (YYYY-MM-DD).
+function parseDateDisplay(str) {
+  if (!str) return null;
+  const parts = str.split('/');
+  if (parts.length !== 3) return null;
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  if (!day || !month || !year) return null;
+  const dt = new Date(year, month - 1, day);
+  if (isNaN(dt)) return null;
+  return dt.toISOString().split('T')[0];
+}
+
+// Update visible and hidden date inputs simultaneously
+function updateDateInputs(isoDate) {
+  document.getElementById('logDate').value = isoDate;
+  document.getElementById('logDateDisplay').value = formatDateDisplay(isoDate);
+}
+
+// Format a Date object to DD/MM/YYYY HH:MM (24h clock)
+function formatDateTimeDisplay(dateObj) {
+  const day = ('0' + dateObj.getDate()).slice(-2);
+  const month = ('0' + (dateObj.getMonth() + 1)).slice(-2);
+  const year = dateObj.getFullYear();
+  const hours = ('0' + dateObj.getHours()).slice(-2);
+  const minutes = ('0' + dateObj.getMinutes()).slice(-2);
+  return `${day}/${month}/${year}, ${hours}:${minutes}`;
+}
 // Tab switching
 const tabs = {
   tabSettings: 'sectionSettings',
@@ -603,13 +654,15 @@ document.getElementById('settingsForm').addEventListener('submit', function(e) {
 // Log form
 function setLogDateToToday() {
   const today = new Date().toISOString().split('T')[0];
-  document.getElementById('logDate').value = today;
+  updateDateInputs(today);
 }
 setLogDateToToday();
 function adjustDate(days) {
-  const d = new Date(document.getElementById('logDate').value);
+  const currentIso = document.getElementById('logDate').value;
+  const d = new Date(currentIso);
   d.setDate(d.getDate() + days);
-  document.getElementById('logDate').value = d.toISOString().split('T')[0];
+  const newIso = d.toISOString().split('T')[0];
+  updateDateInputs(newIso);
   loadEntryForm();
 }
 document.getElementById('prevDay').addEventListener('click', () => adjustDate(-1));
@@ -665,7 +718,15 @@ function loadEntryForm() {
     document.getElementById('dailyWeight').value = '';
   }
 }
-document.getElementById('logDate').addEventListener('change', loadEntryForm);
+// When user edits the visible date, parse and update the hidden ISO date and reload form
+document.getElementById('logDateDisplay').addEventListener('change', () => {
+  const disp = document.getElementById('logDateDisplay').value;
+  const iso = parseDateDisplay(disp);
+  if (iso) {
+    updateDateInputs(iso);
+    loadEntryForm();
+  }
+});
 document.getElementById('logForm').addEventListener('submit', function(e) {
   e.preventDefault();
   const settings = getSettings();
@@ -725,17 +786,23 @@ function loadSummary() {
   let html = '';
   // Build metric cards for average deficit and projections
   html += '<div class="metric-cards">';
+  // 30-day average deficit card
   html += '<div class="metric-card" style="border-left:4px solid var(--primary-blue);">';
-  html += '<div class="title">30 päeva keskmine defitsiit</div>';
+  html += '<div class="icon" style="color: var(--primary-blue);"><i class="fas fa-fire"></i></div>';
   html += '<div class="value">' + avgDef.toFixed(0) + ' kcal</div>';
+  html += '<div class="title">30 päeva keskmine defitsiit</div>';
   html += '</div>';
+  // weekly projection card
   html += '<div class="metric-card" style="border-left:4px solid var(--primary-green);">';
-  html += '<div class="title">Prognoos nädalas</div>';
+  html += '<div class="icon" style="color: var(--primary-green);"><i class="fas fa-calendar-week"></i></div>';
   html += '<div class="value">' + weekly.toFixed(2) + ' kg</div>';
+  html += '<div class="title">Prognoos nädalas</div>';
   html += '</div>';
+  // monthly projection card
   html += '<div class="metric-card" style="border-left:4px solid var(--primary-orange);">';
-  html += '<div class="title">Prognoos kuus</div>';
+  html += '<div class="icon" style="color: var(--primary-orange);"><i class="fas fa-calendar-alt"></i></div>';
   html += '<div class="value">' + monthly.toFixed(2) + ' kg</div>';
+  html += '<div class="title">Prognoos kuus</div>';
   html += '</div>';
   html += '</div>';
   // Table
@@ -743,7 +810,7 @@ function loadSummary() {
   const tdee = computeTDEE(settings, settings.weight);
   for (const e of entries) {
     html += '<tr>';
-    html += '<td>' + e.date + '</td>';
+    html += '<td>' + formatDateDisplay(e.date) + '</td>';
     html += '<td>' + e.calories + '</td>';
     html += '<td>' + (e.exercise || '-') + '</td>';
     html += '<td>' + e.deficit.toFixed(0) + '</td>';
@@ -755,7 +822,7 @@ function loadSummary() {
   document.getElementById('summaryContent').innerHTML = html;
   // Chart
   const ctx = document.getElementById('deficitChart').getContext('2d');
-  const labels = entries.map(e => e.date);
+  const labels = entries.map(e => formatDateDisplay(e.date));
   const deficits = entries.map(e => e.deficit);
   if (window.deficitChart) window.deficitChart.destroy();
   // Determine colors based on current theme
@@ -853,7 +920,9 @@ function updateFastingUI() {
   const minutes = Math.floor((remaining / (1000 * 60)) % 60);
   const seconds = Math.floor((remaining / 1000) % 60);
   statusDiv.innerHTML = '<strong>Paast:</strong> ' + f.label;
-  detailsDiv.innerHTML = `Alustas: ${start.toLocaleString()}<br>Lõpeb: ${end.toLocaleString()}<br>Jäänud: ${hours}h ${minutes}m ${seconds}s`;
+  const startStr = formatDateTimeDisplay(start);
+  const endStr = formatDateTimeDisplay(end);
+  detailsDiv.innerHTML = `Alustas: ${startStr}<br>Lõpeb: ${endStr}<br>Jäänud: ${hours}h ${minutes}m ${seconds}s`;
   if (remaining <= 0) {
     statusDiv.innerHTML += '<br><strong>Paast on läbi! Võid süüa.</strong>';
     progressBar.style.width = '100%';
