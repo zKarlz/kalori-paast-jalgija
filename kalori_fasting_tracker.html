@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalori- ja kaalupäevik + Paastu jälgija</title>
+  <!-- Chart.js for graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <style>
+    :root {
+      --primary: #006bb3;
+      --secondary: #f5f5f5;
+      --accent: #ff7043;
+      --text: #333;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--secondary);
+      color: var(--text);
+    }
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 1rem;
+      text-align: center;
+    }
+    nav {
+      display: flex;
+      justify-content: space-around;
+      background: #e0e0e0;
+      padding: 0.5rem;
+    }
+    nav button {
+      background: none;
+      border: none;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      color: var(--primary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    nav button.active {
+      border-color: var(--primary);
+      font-weight: bold;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    .section {
+      display: none;
+      margin-top: 1rem;
+    }
+    .section.active {
+      display: block;
+    }
+    form {
+      margin-top: 1rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+    input, select {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 0.8rem;
+      box-sizing: border-box;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    th {
+      background: var(--primary);
+      color: #fff;
+    }
+    .summary-box, .fast-box {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 1rem;
+      margin-top: 1rem;
+      border-radius: 4px;
+    }
+    .progress-container {
+      width: 100%;
+      background: #eee;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 12px;
+      background: var(--accent);
+      width: 0;
+    }
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    button.save-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+    button.secondary-btn {
+      background: #ddd;
+      border: none;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+    button.danger-btn {
+      background: #d32f2f;
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Kalori- ja kaalupäevik + Paastu jälgija</h1>
+  </header>
+  <nav>
+    <button id="tabSettings" class="active">Seaded</button>
+    <button id="tabLog">Päevik</button>
+    <button id="tabSummary">Kokkuvõte</button>
+    <button id="tabFasting">Paast</button>
+  </nav>
+  <div class="container">
+    <!-- Settings Section -->
+    <div id="sectionSettings" class="section active">
+      <h2>Seaded</h2>
+      <form id="settingsForm">
+        <label for="gender">Sugu</label>
+        <select id="gender" required>
+          <option value="male">Mees</option>
+          <option value="female">Naine</option>
+        </select>
+        <label for="age">Vanus (aastates)</label>
+        <input type="number" id="age" min="0" step="1" required />
+        <label for="height">Pikkus (cm)</label>
+        <input type="number" id="height" min="0" step="1" required />
+        <label for="weight">Kaal (kg)</label>
+        <input type="number" id="weight" min="0" step="0.1" required />
+        <label for="activity">Aktiivsus</label>
+        <select id="activity" required>
+          <option value="1.2">Istuv</option>
+          <option value="1.375">Kerge</option>
+          <option value="1.55">Mõõdukas</option>
+          <option value="1.725">Aktiivne</option>
+          <option value="1.9">Väga aktiivne</option>
+        </select>
+        <label for="manualTdee">Manuaalne TDEE (kcal, valikuline)</label>
+        <input type="number" id="manualTdee" min="0" step="10" />
+        <label for="deficit">Soovitud päevane defitsiit (kcal)</label>
+        <input type="number" id="deficit" min="0" step="10" value="500" required />
+        <button type="submit" class="save-btn">Salvesta seaded</button>
+      </form>
+      <div id="tdeeDisplay" style="margin-top:0.5rem;"></div>
+    </div>
+    <!-- Log Section -->
+    <div id="sectionLog" class="section">
+      <h2>Päeviku kanne</h2>
+      <form id="logForm">
+        <label for="logDate">Kuupäev</label>
+        <div class="btn-row">
+          <button type="button" class="secondary-btn" id="prevDay">←</button>
+          <input type="date" id="logDate" required />
+          <button type="button" class="secondary-btn" id="nextDay">→</button>
+        </div>
+        <label for="calories">Tarbitud kalorid (kcal)</label>
+        <div class="btn-row">
+          <input type="number" id="calories" min="0" step="1" required />
+          <button type="button" class="secondary-btn" id="calMinus100">-100</button>
+          <button type="button" class="secondary-btn" id="calPlus100">+100</button>
+        </div>
+        <label for="exercise">Treeningu kulutus (kcal, valikuline)</label>
+        <div class="btn-row">
+          <input type="number" id="exercise" min="0" step="1" />
+          <button type="button" class="secondary-btn" id="exMinus50">-50</button>
+          <button type="button" class="secondary-btn" id="exPlus50">+50</button>
+        </div>
+        <label for="dailyWeight">Kaal (kg, valikuline)</label>
+        <div class="btn-row">
+          <input type="number" id="dailyWeight" min="0" step="0.1" />
+          <button type="button" class="secondary-btn" id="wtMinus">-0.1</button>
+          <button type="button" class="secondary-btn" id="wtPlus">+0.1</button>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="save-btn">Salvesta kanne</button>
+          <button type="button" class="secondary-btn" id="copyYesterday">Kopeeri eilne</button>
+        </div>
+      </form>
+    </div>
+    <!-- Summary Section -->
+    <div id="sectionSummary" class="section">
+      <h2>Kokkuvõte ja trendid</h2>
+      <div id="summaryContent"></div>
+      <canvas id="deficitChart" style="width: 100%; height: 300px;"></canvas>
+      <div class="btn-row" style="margin-top: 0.5rem;">
+        <button type="button" class="secondary-btn" id="exportBtn">Ekspordi andmed</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;" />
+        <button type="button" class="secondary-btn" id="importBtn">Impordi andmed</button>
+      </div>
+    </div>
+    <!-- Fasting Section -->
+    <div id="sectionFasting" class="section">
+      <h2>Paastu jälgija</h2>
+      <div class="fast-box">
+        <div class="btn-row">
+          <label for="fastPreset">Pre‑seadistus (tundides)</label>
+          <select id="fastPreset">
+            <option value="12">12 t</option>
+            <option value="14">14 t</option>
+            <option value="16" selected>16 t</option>
+            <option value="18">18 t</option>
+            <option value="20">20 t</option>
+            <option value="24">24 t</option>
+          </select>
+          <input type="text" id="fastLabel" placeholder="Silt (nt 16:8)" style="flex:1;" />
+          <button type="button" class="save-btn" id="startFastBtn">Alusta paastu</button>
+          <button type="button" class="danger-btn" id="endFastBtn">Lõpeta</button>
+        </div>
+        <details style="margin-top:0.5rem;">
+          <summary>Kohandatud aeg (alusta ja lõpp)</summary>
+          <div class="btn-row" style="margin-top:0.5rem;">
+            <label for="fastStart">Algus</label>
+            <input type="datetime-local" id="fastStart" />
+            <label for="fastEnd">Lõpp</label>
+            <input type="datetime-local" id="fastEnd" />
+            <button type="button" class="save-btn" id="customFastBtn">Alusta valitud ajaga</button>
+          </div>
+        </details>
+        <div id="fastStatus" style="margin-top:1rem;"></div>
+        <div class="progress-container" style="margin-top:0.5rem;">
+          <div id="fastProgress" class="progress-bar"></div>
+        </div>
+        <div id="fastDetails" style="margin-top:0.5rem;font-size:0.9rem;"></div>
+      </div>
+    </div>
+  </div>
+<script>
+// Utility functions
+function getSettings() {
+  const d = localStorage.getItem('tracker_settings');
+  return d ? JSON.parse(d) : null;
+}
+function setSettings(s) {
+  localStorage.setItem('tracker_settings', JSON.stringify(s));
+}
+function getEntries() {
+  const d = localStorage.getItem('tracker_entries');
+  return d ? JSON.parse(d) : [];
+}
+function setEntries(arr) {
+  localStorage.setItem('tracker_entries', JSON.stringify(arr));
+}
+function getFasting() {
+  const d = localStorage.getItem('tracker_fasting');
+  return d ? JSON.parse(d) : { active:false };
+}
+function setFasting(obj) {
+  localStorage.setItem('tracker_fasting', JSON.stringify(obj));
+}
+function computeBMR({ gender, weight, height, age }) {
+  if (gender === 'male') {
+    return 10 * weight + 6.25 * height - 5 * age + 5;
+  } else {
+    return 10 * weight + 6.25 * height - 5 * age - 161;
+  }
+}
+function computeTDEE(settings, weight) {
+  if (!settings) return 0;
+  if (settings.manualTdee && settings.manualTdee > 0) return settings.manualTdee;
+  const bmr = computeBMR({
+    gender: settings.gender,
+    weight: weight,
+    height: settings.height,
+    age: settings.age
+  });
+  return Math.round(bmr * parseFloat(settings.activity));
+}
+function dateToISO(date) {
+  const d = new Date(date);
+  return d.toISOString().split('T')[0];
+}
+function isoToDate(str) {
+  return new Date(str);
+}
+// Tab switching
+const tabs = {
+  tabSettings: 'sectionSettings',
+  tabLog: 'sectionLog',
+  tabSummary: 'sectionSummary',
+  tabFasting: 'sectionFasting'
+};
+Object.keys(tabs).forEach(btnId => {
+  document.getElementById(btnId).addEventListener('click', () => {
+    // set active button
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById(btnId).classList.add('active');
+    // show section
+    document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+    document.getElementById(tabs[btnId]).classList.add('active');
+    // if summary, reload
+    if (btnId === 'tabSummary') {
+      loadSummary();
+    }
+    if (btnId === 'tabFasting') {
+      updateFastingUI();
+    }
+  });
+});
+// Load settings into form
+function loadSettings() {
+  const s = getSettings();
+  if (!s) return;
+  document.getElementById('gender').value = s.gender;
+  document.getElementById('age').value = s.age;
+  document.getElementById('height').value = s.height;
+  document.getElementById('weight').value = s.weight;
+  document.getElementById('activity').value = s.activity;
+  document.getElementById('manualTdee').value = s.manualTdee || '';
+  document.getElementById('deficit').value = s.deficit || 500;
+  const tdee = computeTDEE(s, s.weight);
+  document.getElementById('tdeeDisplay').innerHTML = '<strong>Arvutatud TDEE:</strong> ' + tdee + ' kcal';
+}
+// Save settings
+document.getElementById('settingsForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const s = {
+    gender: document.getElementById('gender').value,
+    age: parseInt(document.getElementById('age').value),
+    height: parseFloat(document.getElementById('height').value),
+    weight: parseFloat(document.getElementById('weight').value),
+    activity: document.getElementById('activity').value,
+    manualTdee: document.getElementById('manualTdee').value ? parseFloat(document.getElementById('manualTdee').value) : null,
+    deficit: parseFloat(document.getElementById('deficit').value) || 500
+  };
+  setSettings(s);
+  const tdee = computeTDEE(s, s.weight);
+  document.getElementById('tdeeDisplay').innerHTML = '<strong>Arvutatud TDEE:</strong> ' + tdee + ' kcal';
+  alert('Seaded salvestatud!');
+});
+// Log form
+function setLogDateToToday() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('logDate').value = today;
+}
+setLogDateToToday();
+function adjustDate(days) {
+  const d = new Date(document.getElementById('logDate').value);
+  d.setDate(d.getDate() + days);
+  document.getElementById('logDate').value = d.toISOString().split('T')[0];
+  loadEntryForm();
+}
+document.getElementById('prevDay').addEventListener('click', () => adjustDate(-1));
+document.getElementById('nextDay').addEventListener('click', () => adjustDate(1));
+document.getElementById('calMinus100').addEventListener('click', () => {
+  const val = parseFloat(document.getElementById('calories').value) || 0;
+  document.getElementById('calories').value = Math.max(0, val - 100);
+});
+document.getElementById('calPlus100').addEventListener('click', () => {
+  const val = parseFloat(document.getElementById('calories').value) || 0;
+  document.getElementById('calories').value = val + 100;
+});
+document.getElementById('exMinus50').addEventListener('click', () => {
+  const val = parseFloat(document.getElementById('exercise').value) || 0;
+  document.getElementById('exercise').value = Math.max(0, val - 50);
+});
+document.getElementById('exPlus50').addEventListener('click', () => {
+  const val = parseFloat(document.getElementById('exercise').value) || 0;
+  document.getElementById('exercise').value = val + 50;
+});
+document.getElementById('wtMinus').addEventListener('click', () => {
+  const val = parseFloat(document.getElementById('dailyWeight').value) || 0;
+  document.getElementById('dailyWeight').value = Math.max(0, (val - 0.1).toFixed(1));
+});
+document.getElementById('wtPlus').addEventListener('click', () => {
+  const val = parseFloat(document.getElementById('dailyWeight').value) || 0;
+  document.getElementById('dailyWeight').value = (val + 0.1).toFixed(1);
+});
+document.getElementById('copyYesterday').addEventListener('click', () => {
+  const date = new Date(document.getElementById('logDate').value);
+  const yesterday = new Date(date);
+  yesterday.setDate(date.getDate() - 1);
+  const yKey = yesterday.toISOString().split('T')[0];
+  const entries = getEntries();
+  const entry = entries.find(e => e.date === yKey);
+  if (entry) {
+    document.getElementById('calories').value = entry.calories;
+    document.getElementById('exercise').value = entry.exercise || '';
+    document.getElementById('dailyWeight').value = entry.weight || '';
+  }
+});
+function loadEntryForm() {
+  const key = document.getElementById('logDate').value;
+  const entries = getEntries();
+  const entry = entries.find(e => e.date === key);
+  if (entry) {
+    document.getElementById('calories').value = entry.calories;
+    document.getElementById('exercise').value = entry.exercise || '';
+    document.getElementById('dailyWeight').value = entry.weight || '';
+  } else {
+    document.getElementById('calories').value = '';
+    document.getElementById('exercise').value = '';
+    document.getElementById('dailyWeight').value = '';
+  }
+}
+document.getElementById('logDate').addEventListener('change', loadEntryForm);
+document.getElementById('logForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const settings = getSettings();
+  if (!settings) { alert('Palun sisesta seaded enne kandeid.'); return; }
+  const date = document.getElementById('logDate').value;
+  const calories = parseFloat(document.getElementById('calories').value) || 0;
+  const exercise = parseFloat(document.getElementById('exercise').value) || 0;
+  const weightVal = document.getElementById('dailyWeight').value;
+  let weight = parseFloat(weightVal) || null;
+  if (!weight) {
+    // if weight not provided, use last known weight
+    const entries = getEntries().sort((a,b) => a.date.localeCompare(b.date));
+    let last = settings.weight;
+    for (const ent of entries) {
+      if (ent.date <= date && ent.weight) last = ent.weight;
+    }
+    weight = last;
+  }
+  const tdee = computeTDEE(settings, weight);
+  const deficit = (tdee + exercise) - calories;
+  let entriesArr = getEntries();
+  const idx = entriesArr.findIndex(e => e.date === date);
+  const entryData = { date: date, calories: calories, exercise: exercise, weight: weight, deficit: deficit };
+  if (idx >= 0) entriesArr[idx] = entryData;
+  else entriesArr.push(entryData);
+  setEntries(entriesArr);
+  alert('Kanne salvestatud!');
+});
+// Summary section
+function loadSummary() {
+  const entries = getEntries().sort((a,b) => a.date.localeCompare(b.date));
+  const settings = getSettings();
+  if (!settings) {
+    document.getElementById('summaryContent').innerHTML = '<p>Seadmed on täitmata.</p>';
+    return;
+  }
+  if (entries.length === 0) {
+    document.getElementById('summaryContent').innerHTML = '<p>Kanded puuduvad.</p>';
+    return;
+  }
+  // 30 päeva
+  const today = new Date();
+  const start = new Date();
+  start.setDate(today.getDate() - 29);
+  let sumDef = 0;
+  let count = 0;
+  for (const e of entries) {
+    const d = new Date(e.date);
+    if (d >= start && d <= today) {
+      sumDef += e.deficit;
+      count++;
+    }
+  }
+  const avgDef = count > 0 ? sumDef / count : 0;
+  const weekly = avgDef / 7700 * 7;
+  const monthly = avgDef / 7700 * 30;
+  let html = '';
+  html += '<div class="summary-box">';
+  html += '<p><strong>30 päeva keskmine defitsiit:</strong> ' + avgDef.toFixed(0) + ' kcal</p>';
+  html += '<p><strong>Prognoos:</strong> ' + weekly.toFixed(2) + ' kg nädalas, ' + monthly.toFixed(2) + ' kg kuus</p>';
+  html += '</div>';
+  // Table
+  html += '<table><thead><tr><th>Kuupäev</th><th>Kalorid</th><th>Treening</th><th>Defitsiit</th><th>Kaal</th></tr></thead><tbody>';
+  const tdee = computeTDEE(settings, settings.weight);
+  for (const e of entries) {
+    html += '<tr>';
+    html += '<td>' + e.date + '</td>';
+    html += '<td>' + e.calories + '</td>';
+    html += '<td>' + (e.exercise || '-') + '</td>';
+    html += '<td>' + e.deficit.toFixed(0) + '</td>';
+    html += '<td>' + (e.weight || '-') + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('summaryContent').innerHTML = html;
+  // Chart
+  const ctx = document.getElementById('deficitChart').getContext('2d');
+  const labels = entries.map(e => e.date);
+  const deficits = entries.map(e => e.deficit);
+  if (window.deficitChart) window.deficitChart.destroy();
+  window.deficitChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Defitsiit (kcal)',
+          data: deficits,
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          tension: 0.2,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      scales: {
+        x: { title: { display: true, text: 'Kuupäev' } },
+        y: { title: { display: true, text: 'Defitsiit (kcal)' } }
+      },
+      plugins: {
+        legend: { display: true }
+      }
+    }
+  });
+}
+// Export / Import
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const data = { settings: getSettings(), entries: getEntries(), fasting: getFasting() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'tracker_backup.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('importBtn').addEventListener('click', () => {
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const obj = JSON.parse(ev.target.result);
+      if (obj.settings) setSettings(obj.settings);
+      if (obj.entries) setEntries(obj.entries);
+      if (obj.fasting) setFasting(obj.fasting);
+      loadSettings();
+      alert('Andmed imporditud!');
+    } catch(err) {
+      alert('Vigane fail.');
+    }
+  };
+  reader.readAsText(file);
+});
+// Fasting tracker
+let fastTimer = null;
+function updateFastingUI() {
+  const f = getFasting();
+  const statusDiv = document.getElementById('fastStatus');
+  const progressBar = document.getElementById('fastProgress');
+  const detailsDiv = document.getElementById('fastDetails');
+  if (!f || !f.active) {
+    statusDiv.textContent = 'Paast ei ole aktiivne.';
+    progressBar.style.width = '0%';
+    detailsDiv.textContent = '';
+    return;
+  }
+  const start = new Date(f.startISO);
+  const end = new Date(f.endISO);
+  const now = new Date();
+  const total = end - start;
+  const done = now - start;
+  const pct = Math.max(0, Math.min(100, (done / total * 100)));
+  progressBar.style.width = pct + '%';
+  const remaining = end - now;
+  const hours = Math.floor(remaining / (1000 * 60 * 60));
+  const minutes = Math.floor((remaining / (1000 * 60)) % 60);
+  const seconds = Math.floor((remaining / 1000) % 60);
+  statusDiv.innerHTML = '<strong>Paast:</strong> ' + f.label;
+  detailsDiv.innerHTML = `Alustas: ${start.toLocaleString()}<br>Lõpeb: ${end.toLocaleString()}<br>Jäänud: ${hours}h ${minutes}m ${seconds}s`;
+  if (remaining <= 0) {
+    statusDiv.innerHTML += '<br><strong>Paast on läbi! Võid süüa.</strong>';
+    progressBar.style.width = '100%';
+    // Clear fasting state
+    setFasting({ active: false });
+    clearInterval(fastTimer);
+    // Notification
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification('Paast läbi – aeg süüa', { body: f.label || '' });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(p => {
+          if (p === 'granted') new Notification('Paast läbi – aeg süüa', { body: f.label || '' });
+        });
+      }
+    }
+    // Play beep
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc.stop(ctx.currentTime + 0.8);
+    } catch(err) {}
+  }
+}
+function startFast(durationHours) {
+  const now = new Date();
+  const end = new Date(now.getTime() + durationHours * 3600 * 1000);
+  const label = document.getElementById('fastLabel').value || (durationHours + 'h');
+  const f = { active: true, startISO: now.toISOString(), endISO: end.toISOString(), label: label };
+  setFasting(f);
+  updateFastingUI();
+  if (fastTimer) clearInterval(fastTimer);
+  fastTimer = setInterval(updateFastingUI, 1000);
+  alert('Paast alustatud!');
+}
+function startCustomFast() {
+  const startVal = document.getElementById('fastStart').value;
+  const endVal = document.getElementById('fastEnd').value;
+  if (!startVal || !endVal) { alert('Vali algus ja lõpp'); return; }
+  const s = new Date(startVal);
+  const e = new Date(endVal);
+  if (e <= s) { alert('Lõpp peab olema hiljem kui algus'); return; }
+  const label = 'Custom';
+  const f = { active: true, startISO: s.toISOString(), endISO: e.toISOString(), label: label };
+  setFasting(f);
+  updateFastingUI();
+  if (fastTimer) clearInterval(fastTimer);
+  fastTimer = setInterval(updateFastingUI, 1000);
+  alert('Paast alustatud!');
+}
+document.getElementById('startFastBtn').addEventListener('click', () => {
+  const dur = parseInt(document.getElementById('fastPreset').value);
+  // request notification permission
+  if ('Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission();
+  }
+  startFast(dur);
+});
+document.getElementById('customFastBtn').addEventListener('click', () => {
+  // request notification permission
+  if ('Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission();
+  }
+  startCustomFast();
+});
+document.getElementById('endFastBtn').addEventListener('click', () => {
+  setFasting({ active: false });
+  updateFastingUI();
+  if (fastTimer) clearInterval(fastTimer);
+  alert('Paast lõppenud.');
+});
+// Initialize
+window.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  loadEntryForm();
+  updateFastingUI();
+  // Start timer if fasting active
+  const f = getFasting();
+  if (f && f.active) {
+    fastTimer = setInterval(updateFastingUI, 1000);
+  }
+});
+</script>
+</body>
+</html>
